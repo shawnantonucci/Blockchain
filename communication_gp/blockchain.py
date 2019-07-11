@@ -16,7 +16,20 @@ class Blockchain(object):
         self.current_transactions = []
         self.nodes = set()
 
-        self.new_block(previous_hash=1, proof=100)
+        # self.new_block(previous_hash=1, proof=100)
+        self.create_genesis_block()
+
+    def create_genesis_block(self):
+
+        block = {
+            'index': 1,
+            'timestamp': 0,
+            'transactions': [],
+            'proof': 99,
+            'previous_hash': 1,
+        }
+
+        self.chain.append(block)
 
     def new_block(self, proof, previous_hash=None):
         """
@@ -297,6 +310,21 @@ def consensus():
         }
 
     return jsonify(response), 200
+
+@app.route('/block/new', methods=['POST'])
+def new_block():
+    values = request.get_json()
+
+    required = ["block"]
+    if not all(k in values for k in required):
+        return "Missing Values", 400
+
+    new_block = values['block']
+    last_block = blockchain.last_block
+
+    if new_block['index'] == last_block['index'] + 1:
+        if new_block['previous_hash'] == blockchain.hash(last_block):
+            if blockchain.valid_proof(last_block['proof'], new_block["proof"]):
 
 
 # Note, when demoing, start with this, then change to the below
