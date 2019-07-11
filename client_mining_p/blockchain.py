@@ -4,11 +4,7 @@ from time import time
 from uuid import uuid4
 
 from flask import Flask, jsonify, request
-
-import requests
-
 import sys
-
 
 class Blockchain(object):
     def __init__(self):
@@ -16,12 +12,11 @@ class Blockchain(object):
         self.current_transactions = []
         self.nodes = set()
 
-        self.new_block(previous_hash=1, proof=99) #99 to make it mine faster for testing
+        self.new_block(previous_hash=1, proof=99)
 
     def new_block(self, proof, previous_hash=None):
         """
         Create a new Block in the Blockchain
-
         :param proof: <int> The proof given by the Proof of Work algorithm
         :param previous_hash: (Optional) <str> Hash of previous Block
         :return: <dict> New Block
@@ -44,7 +39,6 @@ class Blockchain(object):
     def new_transaction(self, sender, recipient, amount):
         """
         Creates a new transaction to go into the next mined Block
-
         :param sender: <str> Address of the Recipient
         :param recipient: <str> Address of the Recipient
         :param amount: <int> Amount
@@ -63,7 +57,6 @@ class Blockchain(object):
     def hash(block):
         """
         Creates a SHA-256 hash of a Block
-
         :param block": <dict> Block
         "return": <str>
         """
@@ -95,7 +88,7 @@ class Blockchain(object):
     @staticmethod
     def valid_proof(last_proof, proof):
         """
-        Validates the Proof:  Does hash(last_proof, proof) contain 4
+        Validates the Proof:  Does hash(last_proof, proof) contain 6
         leading zeroes?
         """
         guess = f'{last_proof}{proof}'.encode()
@@ -105,7 +98,6 @@ class Blockchain(object):
     def valid_chain(self, chain):
         """
         Determine if a given blockchain is valid
-
         :param chain: <list> A blockchain
         :return: <bool> True if valid, False if not
         """
@@ -129,8 +121,6 @@ class Blockchain(object):
             last_block = block
             current_index += 1
 
-        return True
-
 
 # Instantiate our Node
 app = Flask(__name__)
@@ -144,33 +134,31 @@ blockchain = Blockchain()
 
 @app.route('/mine', methods=['POST'])
 def mine():
-    # get data from client
-    data = request.data
-    dataDict = json.loads(data)
-    print("data: ", dataDict["data"])
-    print("last_proof: ", dataDict["last_proof"])
-    guess_hash = dataDict["data"]
+    print("/MINE ROUTE CALLED ")
+    proof = request.get_json()['proof']
+    # prev_proof = request.get_json()['prev_proof']
+    print(proof)
+    # print(prev_proof)
+    # print(proof < prev_proof)
 
-    # We run the proof of work algorithm to get the next proof...
-    # print(guess_hash, "from server")
+    # # We run the proof of work algorithm to get the next proof...
     last_block = blockchain.last_block
     last_proof = last_block['proof']
-    # proof = blockchain.proof_of_work(guess_hash)
-    blockchain.valid_proof(last_proof, guess_hash)
+    # proof = blockchain.proof_of_work(last_proof)
+    if blockchain.valid_proof(last_proof, proof):
+        # --- proof is correct, add it to the block chain
 
-    # We must receive a reward for finding the proof.
-    # The sender is "0" to signify that this node has mine a new coin
-    # blockchain.new_transaction(
-    #     sender="0",
-    #     recipient=node_identifier,
-    #     amount=1,
-    # )
+        # We must receive a reward for finding the proof.
+        # The sender is "0" to signify that this node has mine a new coin
+        blockchain.new_transaction(
+            sender="0",
+            recipient=node_identifier,
+            amount=1,
+        )
 
-    # Forge the new BLock by adding it to the chain
-    previous_hash = blockchain.hash(last_block)
-    block = blockchain.new_block(guess_hash, previous_hash)
-
-    if blockchain.valid_proof is not False:
+        # Forge the new BLock by adding it to the chain
+        previous_hash = blockchain.hash(last_block)
+        block = blockchain.new_block(proof, previous_hash)
 
         response = {
             'message': "New Block Forged",
@@ -178,13 +166,18 @@ def mine():
             'transactions': block['transactions'],
             'proof': block['proof'],
             'previous_hash': block['previous_hash'],
+            'coin': 1
         }
-        print("Valid Proof")
-        return jsonify(response, "Valid Proof"), 200
 
-    else:
-        print("Invalid Proof")
-        return jsonify("Invalid Proof"), 200
+        return jsonify(response), 200
+
+    else :
+        #  --- proof is incorrect, send refusal
+        response = {
+            'message': "Sorry, that proof won't work, try again",
+        }
+        return jsonify(response), 400
+
 
 
 @app.route('/transactions/new', methods=['POST'])
@@ -213,18 +206,16 @@ def full_chain():
     }
     return jsonify(response), 200
 
+
+# NOTE: Last proof refers to the most recent block in the chain not the previous block
 @app.route('/last_proof', methods=['GET'])
 def last_proof():
-    if len(blockchain.chain) > 0:
-        response = {
-            'proof': blockchain.last_block,
-        }
-        return jsonify(response), 200
-    else:
-        response = {
-            'proof': None
-        }
-        return jsonify(response), 404
+    # print("BLOCKCHAIN: ", blockchain.chain[-1]["proof"])
+    response = {
+        'proof': blockchain.chain[-1]["proof"]
+    }
+    return jsonify(response), 200
+
 
 # Note, when demoing, start with this, then change to the below
 # if __name__ == '__main__':
